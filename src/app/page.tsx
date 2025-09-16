@@ -67,9 +67,12 @@ export default function Page() {
   if (!connected) {
     return (
       <div className="min-h-dvh grid place-items-center p-6">
+        <h1 className="text-6xl font-semibold">VAUCH AI VOICE AGENT</h1>
         <div className="w-full max-w-md space-y-4">
-          <h1 className="text-2xl font-semibold">VAUCH AI Voice Agent</h1>
           <label className="block">
+            <span className="text-2xl text-sm">For Testing Use your name as Room Name and any name as Username</span>
+            <br />
+            <br />
             <span className="text-sm">Room</span>
             <input
               className="mt-1 w-full rounded border px-3 py-2"
