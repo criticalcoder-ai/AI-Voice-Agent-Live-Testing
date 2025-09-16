@@ -13,11 +13,11 @@ import '@livekit/components-styles';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export default function Page() {
-  const [roomName, setRoomName] = useState('voice-room');
-  const [username, setUsername] = useState('guest');
   const [connecting, setConnecting] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const roomInstance = useMemo(
     () =>
@@ -28,33 +28,42 @@ export default function Page() {
     []
   );
 
-  const connect = useCallback(async () => {
-    try {
-      setError(null);
-      setConnecting(true);
-      const apiBase = (process.env.NEXT_PUBLIC_API_BASE as string | undefined) || '';
-      const base = apiBase ? apiBase.replace(/\/$/, '') : '';
-      const url = `${base}/api/generate-token?room=${encodeURIComponent(roomName)}&username=${encodeURIComponent(username)}`;
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        const msg = await resp.text();
-        throw new Error(`Token request failed: ${resp.status} ${msg}`);
+  const connect = useCallback(
+    async (override?: { room: string; user: string }) => {
+      try {
+        setError(null);
+        setConnecting(true);
+        // prefer override -> state -> generate
+        const room = override?.room ?? sessionId ?? `session-${Math.random().toString(36).slice(2, 10)}`;
+        const user = override?.user ?? userId ?? `user-${Math.random().toString(36).slice(2, 10)}`;
+        if (!sessionId) setSessionId(room);
+        if (!userId) setUserId(user);
+
+        const apiBase = (process.env.NEXT_PUBLIC_API_BASE as string | undefined) || '';
+        const base = apiBase ? apiBase.replace(/\/$/, '') : '';
+        const url = `${base}/api/generate-token?room=${encodeURIComponent(room)}&username=${encodeURIComponent(user)}`;
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          const msg = await resp.text();
+          throw new Error(`Token request failed: ${resp.status} ${msg}`);
+        }
+        const data = await resp.json();
+        if (!data.token) throw new Error('No token received');
+        const wsUrl = (data.wsUrl as string | undefined) || (process.env.NEXT_PUBLIC_LIVEKIT_URL as string | undefined);
+        if (!wsUrl) throw new Error('LiveKit URL not provided by server and NEXT_PUBLIC_LIVEKIT_URL is not set');
+        await roomInstance.connect(wsUrl, data.token);
+        // enable mic after connect for voice agent
+        await roomInstance.localParticipant.setMicrophoneEnabled(true);
+        setConnected(true);
+      } catch (e: any) {
+        console.error(e);
+        setError(e?.message ?? 'Failed to connect');
+      } finally {
+        setConnecting(false);
       }
-      const data = await resp.json();
-      if (!data.token) throw new Error('No token received');
-      const wsUrl = (data.wsUrl as string | undefined) || (process.env.NEXT_PUBLIC_LIVEKIT_URL as string | undefined);
-      if (!wsUrl) throw new Error('LiveKit URL not provided by server and NEXT_PUBLIC_LIVEKIT_URL is not set');
-      await roomInstance.connect(wsUrl, data.token);
-      // enable mic after connect for voice agent
-      await roomInstance.localParticipant.setMicrophoneEnabled(true);
-      setConnected(true);
-    } catch (e: any) {
-      console.error(e);
-      setError(e?.message ?? 'Failed to connect');
-    } finally {
-      setConnecting(false);
-    }
-  }, [roomInstance, roomName, username]);
+    },
+    [roomInstance, sessionId, userId]
+  );
 
   useEffect(() => {
     return () => {
@@ -67,29 +76,13 @@ export default function Page() {
   if (!connected) {
     return (
       <div className="min-h-dvh grid place-items-center p-6">
-        <h1 className="text-6xl font-semibold">VAUCH AI VOICE AGENT</h1>
-        <div className="w-full max-w-md space-y-4">
-          <label className="block">
-            <span className="text-2xl text-sm">For Testing Use your name as Room Name and any name as Username</span>
-            <br />
-            <br />
-            <span className="text-sm">Room</span>
-            <input
-              className="mt-1 w-full rounded border px-3 py-2"
-              value={roomName}
-              onChange={(e) => setRoomName(e.target.value)}
-              placeholder="Enter room name"
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm">Name</span>
-            <input
-              className="mt-1 w-full rounded border px-3 py-2"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your name"
-            />
-          </label>
+        <div className="w-full max-w-md space-y-4 text-center">
+          <h1 className="text-4xl md:text-6xl font-semibold">VAUCH AI VOICE AGENT</h1>
+          {sessionId && (
+            <div className="mx-auto inline-block rounded bg-gray-100 text-gray-800 px-3 py-1 text-sm">
+              Session ID: <span className="font-mono font-semibold">{sessionId}</span>
+            </div>
+          )}
           {error && (
             <div className="text-sm text-red-600" role="alert">
               {error}
@@ -97,14 +90,12 @@ export default function Page() {
           )}
           <button
             className="w-full rounded bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-60"
-            onClick={connect}
-            disabled={connecting || !roomName || !username}
+            onClick={() => connect()}
+            disabled={connecting}
           >
-            {connecting ? 'Connecting...' : 'Start Voice Session'}
+            {connecting ? 'Connecting...' : error ? 'Retry Connection' : 'Start Voice Session'}
           </button>
-          <p className="text-xs text-gray-500">
-            Make sure you allow microphone access when prompted.
-          </p>
+          <p className="text-xs text-gray-500">Make sure you allow microphone access when prompted.</p>
         </div>
       </div>
     );
@@ -112,7 +103,13 @@ export default function Page() {
 
   return (
     <RoomContext.Provider value={roomInstance}>
-      <div data-lk-theme="default" style={{ height: '100dvh' }}>
+      <div data-lk-theme="default" style={{ height: '100dvh', position: 'relative' }}>
+        {/* Session badge */}
+        {sessionId && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 rounded bg-black/70 text-white px-3 py-1 text-xs">
+            Session ID: <span className="font-mono">{sessionId}</span>
+          </div>
+        )}
         <MyVideoConference />
         <RoomAudioRenderer />
         <ControlBar />
