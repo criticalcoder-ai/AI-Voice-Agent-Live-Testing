@@ -7,8 +7,10 @@ import {
   RoomAudioRenderer,
   useTracks,
   RoomContext,
+  BarVisualizer,
+  useVoiceAssistant,
 } from '@livekit/components-react';
-import { Room, Track } from 'livekit-client';
+import { Room, Track, RoomEvent } from 'livekit-client';
 import '@livekit/components-styles';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -27,6 +29,20 @@ export default function Page() {
       }),
     []
   );
+
+  // When the user leaves (disconnects), reset UI to home and prepare a new session
+  useEffect(() => {
+    const handleDisconnected = () => {
+      setConnected(false);
+      setSessionId(null);
+      setUserId(null);
+      setError(null);
+    };
+    roomInstance.on(RoomEvent.Disconnected, handleDisconnected);
+    return () => {
+      roomInstance.off(RoomEvent.Disconnected, handleDisconnected);
+    };
+  }, [roomInstance]);
 
   const connect = useCallback(
     async (override?: { room: string; user: string }) => {
@@ -76,8 +92,11 @@ export default function Page() {
   if (!connected) {
     return (
       <div className="min-h-dvh grid place-items-center p-6">
+        <div className="space-y-4 text-center">
+        <h1 className="text-4xl md:text-6xl font-semibold">VAUCH AI VOICE AGENT</h1>
+        <h2 className='text-xl md:text-5xl font-semibold'>Your personal AI voice agent</h2>
+        </div>
         <div className="w-full max-w-md space-y-4 text-center">
-          <h1 className="text-4xl md:text-6xl font-semibold">VAUCH AI VOICE AGENT</h1>
           {sessionId && (
             <div className="mx-auto inline-block rounded bg-gray-100 text-gray-800 px-3 py-1 text-sm">
               Session ID: <span className="font-mono font-semibold">{sessionId}</span>
@@ -112,7 +131,13 @@ export default function Page() {
         )}
         <MyVideoConference />
         <RoomAudioRenderer />
-        <ControlBar />
+        <ControlBar controls={{
+          microphone: true,
+          camera: false,
+          screenShare: false,
+          chat: false,
+          leave: true,
+        }} />
       </div>
     </RoomContext.Provider>
   );
@@ -121,18 +146,30 @@ export default function Page() {
 function MyVideoConference() {
   // `useTracks` returns all camera and screen share tracks. If a user
   // joins without a published camera track, a placeholder track is returned.
-  const tracks = useTracks(
-    [
-      { source: Track.Source.Camera, withPlaceholder: true },
-      { source: Track.Source.ScreenShare, withPlaceholder: false },
-    ],
-    { onlySubscribed: false },
-  );
-  return (
-    <GridLayout tracks={tracks} style={{ height: 'calc(100vh - var(--lk-control-bar-height))' }}>
-      {/* The GridLayout accepts zero or one child. The child is used
-      as a template to render all passed in tracks. */}
-      <ParticipantTile />
-    </GridLayout>
-  );
+
+
+
+  // const tracks = useTracks(
+  //   [
+  //     { source: Track.Source.Camera, withPlaceholder: true },
+  //     { source: Track.Source.ScreenShare, withPlaceholder: false },
+  //   ],
+  //   { onlySubscribed: false },
+  // );
+  // return (
+  //   <GridLayout tracks={tracks} style={{ height: 'calc(100vh - var(--lk-control-bar-height))' }}>
+  //     {/* The GridLayout accepts zero or one child. The child is used
+  //     as a template to render all passed in tracks. */}
+  //     <ParticipantTile />
+  //   </GridLayout>
+  // );
+
+
+
+  const { state, audioTrack } = useVoiceAssistant();
+return (
+  <div className="h-200">
+    <BarVisualizer state={state} barCount={5} trackRef={audioTrack} />
+  </div>
+);
 }
