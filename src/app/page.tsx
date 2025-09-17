@@ -94,8 +94,8 @@ export default function Page() {
       <div className="min-h-dvh grid place-items-center p-6">
         <div className="space-y-4 text-center">
         <h1 className="text-4xl md:text-6xl font-semibold">VAUCH AI VOICE AGENT</h1>
-        <h2 className='text-xl md:text-5xl font-semibold'>Your Personal AI Voice Agent</h2>
-        <img className="mx-auto hover:cursor-pointer" src="/cropped-Vauch-Info-Logo-1-1-300x194.png" alt="Vauch Info Tech Logo" onClick={() => window.open('https://www.vauchinfotech.com', '_blank')} />
+        <h2 className='mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl dark:text-white'>Your Personal <span className="text-blue-600 dark:text-blue-500">AI Voice Agent</span></h2>
+        <img className="mx-auto flex  hover:cursor-pointer" src="/cropped-Vauch-Info-Logo-1-1-300x194.png" alt="Vauch Info Tech Logo" onClick={() => window.open('https://www.vauchinfotech.com', '_blank')} />
         </div>
         <div className="w-full max-w-md space-y-4 text-center">
           {sessionId && (
