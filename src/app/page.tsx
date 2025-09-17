@@ -168,7 +168,7 @@ function MyVideoConference() {
 
   const { state, audioTrack } = useVoiceAssistant();
 return (
-  <div className="h-200">
+  <div className="h-160">
     <BarVisualizer state={state} barCount={5} trackRef={audioTrack} />
   </div>
 );
